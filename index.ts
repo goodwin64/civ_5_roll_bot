@@ -15,15 +15,75 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
-const civilizations = [
-    "America", "Arabia", "Assyria", "Austria", "Aztec", "Babylon", "Brazil",
-    "Byzantium", "Carthage", "Celtic", "China", "Denmark", "Egypt", "England",
-    "Ethiopia", "France", "Germany", "Greece", "Huns", "Inca", "India",
-    "Indonesia", "Iroquois", "Japan", "Korea", "Maya", "Mongolia", "Morocco",
-    "Netherlands", "Ottoman", "Persia", "Poland", "Polynesia", "Portugal",
-    "Rome", "Russia", "Shoshone", "Siam", "Songhai", "Spain", "Sweden",
-    "Venice", "Zulu"
+type KnownCivilization = {
+    name: string;
+    aliases?: string[]; // for some Civs we want to support multiple names as an input (e.g Zulu / Zulus)
+}
+
+const civilizations: KnownCivilization[] = [
+    { name: "America", aliases: ["American"] },
+    { name: "Arabia", aliases: ["Arabian"] },
+    { name: "Assyria", aliases: ["Assyrian"] },
+    { name: "Austria", aliases: ["Austrian"] },
+    { name: "Aztec", aliases: [] },
+    { name: "Babylon", aliases: ["Babylonian"] },
+    { name: "Brazil", aliases: ["Brazilian"] },
+    { name: "Byzantium", aliases: ["Byzantine"] },
+    { name: "Carthage", aliases: ["Carthaginian"] },
+    { name: "Celtic", aliases: [] },
+    { name: "China", aliases: ["Chinese"] },
+    { name: "Denmark", aliases: ["Danish"] },
+    { name: "Egypt", aliases: ["Egyptian"] },
+    { name: "England", aliases: ["English"] },
+    { name: "Ethiopia", aliases: ["Ethiopian"] },
+    { name: "France", aliases: ["French"] },
+    { name: "Germany", aliases: ["German"] },
+    { name: "Greece", aliases: ["Greek"] },
+    { name: "Huns", aliases: ["Hunnic"] },
+    { name: "Inca", aliases: ["Incan"] },
+    { name: "India", aliases: ["Indian"] },
+    { name: "Indonesia", aliases: ["Indonesian"] },
+    { name: "Iroquois", aliases: ["Iroquois"] },
+    { name: "Japan", aliases: ["Japanese"] },
+    { name: "Korea", aliases: ["Korean"] },
+    { name: "Maya", aliases: ["Mayan"] },
+    { name: "Mongolia", aliases: ["Mongolian", "Mongols"] },
+    { name: "Morocco", aliases: ["Moroccan"] },
+    { name: "Netherlands", aliases: ["Dutch"] },
+    { name: "Ottoman", aliases: [] },
+    { name: "Persia", aliases: ["Persian"] },
+    { name: "Poland", aliases: ["Polish"] },
+    { name: "Polynesia", aliases: ["Polynesian"] },
+    { name: "Portugal", aliases: ["Portuguese"] },
+    { name: "Rome", aliases: ["Roman"] },
+    { name: "Russia", aliases: ["Russian"] },
+    { name: "Shoshone", aliases: [] },
+    { name: "Siam", aliases: ["Siamese"] },
+    { name: "Songhai", aliases: [] },
+    { name: "Spain", aliases: ["Spanish†"] },
+    { name: "Sweden", aliases: ["Swedish"] },
+    { name: "Venice", aliases: ["Venetian"] },
+    { name: "Zulu", aliases: ["Zulus"] },
 ];
+
+const civilizationKnownNames = new Set([
+    ...civilizations.map(c => c.name),
+    ...civilizations.map(c => c.aliases || []).flat(),
+]);
+
+function convertCivPotentialNameToName(civString: string) {
+    const lowercased = civString.toLowerCase();
+    const matchedCiv = civilizations.find(civ => {
+        const matchedByName = civ.name.toLowerCase() === lowercased
+        const matchedByAlias = civ.aliases?.map(al => al.toLowerCase()).includes(lowercased);
+        return matchedByName || matchedByAlias;
+    });
+    return matchedCiv?.name ?? '';
+}
+
+function isKnownCivName(civString: string) {
+    return civilizationKnownNames.has(civString);
+}
 
 let bannedCivs: string[] = [];
 
@@ -65,7 +125,7 @@ const commands = [
         .setDescription('Ban civilizations for the next roll')
         .addStringOption(option =>
             option.setName('civilizations')
-                .setDescription('Civilizations to ban (space-separated)')
+                .setDescription('Civilizations to ban (comma-separated)')
                 .setRequired(true)
                 .setAutocomplete(true))
 ];
@@ -111,7 +171,9 @@ async function handleAutocomplete(interaction: AutocompleteInteraction) {
     const lastInput = inputValues[inputValues.length - 1].toLowerCase();
 
     const alreadyEnteredCivs = new Set(inputValues.slice(0, -1).map(v => v.toLowerCase()));
-    const availableCivs = civilizations.filter(civ => !alreadyEnteredCivs.has(civ.toLowerCase()));
+    const availableCivs = civilizations
+        .map(civ => civ.name)
+        .filter(civ => !alreadyEnteredCivs.has(civ.toLowerCase()));
 
     const filtered = availableCivs.filter(civ => civ.toLowerCase().startsWith(lastInput));
     await interaction.respond(
@@ -137,7 +199,9 @@ async function handleRollCommand(interaction: ChatInputCommandInteraction) {
         playerNames = Array.from({length: playerCount}, (_, i) => `Player ${i + 1}`);
     }
 
-    const availableCivs = civilizations.filter(civ => !bannedCivs.includes(civ));
+    const availableCivs = civilizations
+        .map(civ => civ.name)
+        .filter(civ => !bannedCivs.includes(civ));
     const choices = getPlayerChoices(playerCount, availableCivs);
 
     let response = 'Civilization choices for each player:\n';
@@ -154,9 +218,13 @@ async function handleRollCommand(interaction: ChatInputCommandInteraction) {
 }
 
 async function handleBanCommand(interaction: ChatInputCommandInteraction) {
-    const civsToBan = interaction.options.getString('civilizations', true).split(' ');
+    const civsToBan = interaction.options
+        .getString('civilizations', true)
+        .split(',')
+        .map(name => name.trim())
+        .map(potentialName => convertCivPotentialNameToName(potentialName));
     
-    const invalidCivs = civsToBan.filter(civ => !civilizations.includes(civ));
+    const invalidCivs = civsToBan.filter(civ => !isKnownCivName(civ));
     if (invalidCivs.length > 0) {
         await interaction.reply(`The following civilizations are not recognized: ${invalidCivs.join(', ')}`);
         return;
