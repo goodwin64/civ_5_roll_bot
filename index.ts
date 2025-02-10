@@ -65,7 +65,7 @@ const commands = [
         .setDescription('Ban civilizations for the next roll')
         .addStringOption(option =>
             option.setName('civilizations')
-                .setDescription('Civilizations to ban (space-separated)')
+                .setDescription('Civilizations to ban (comma-separated)')
                 .setRequired(true)
                 .setAutocomplete(true))
 ];
@@ -154,7 +154,7 @@ async function handleRollCommand(interaction: ChatInputCommandInteraction) {
 }
 
 async function handleBanCommand(interaction: ChatInputCommandInteraction) {
-    const civsToBan = interaction.options.getString('civilizations', true).split(' ');
+    const civsToBan = interaction.options.getString('civilizations', true).split(',').map(name => name.trim());
     
     const invalidCivs = civsToBan.filter(civ => !civilizations.includes(civ));
     if (invalidCivs.length > 0) {
