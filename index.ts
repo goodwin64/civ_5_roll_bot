@@ -78,7 +78,7 @@ function convertCivPotentialNameToName(civString: string) {
         const matchedByAlias = civ.aliases?.map(al => al.toLowerCase()).includes(lowercased);
         return matchedByName || matchedByAlias;
     });
-    return matchedCiv?.name || '';
+    return matchedCiv?.name ?? '';
 }
 
 function isKnownCivName(civString: string) {
